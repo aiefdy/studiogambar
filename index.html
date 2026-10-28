@@ -1,0 +1,1733 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Animation Drawing Museum 3D</title>
+    
+    <!-- Tailwind CSS for UI -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Three.js for 3D Museum -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { 
+                        sans: ['Plus Jakarta Sans', 'Inter', 'sans-serif'],
+                        anime: ['Fredoka', 'cursive', 'sans-serif']
+                    },
+                    colors: {
+                        museum: {
+                            light: '#fbfbfe',
+                            dark: '#0f0e17',
+                            accent: '#f25f4c', // Refined Coral Red
+                            pop: '#7f5af0', // Elegant Royal Purple
+                            gold: '#ff8906', // Warm Amber/Gold
+                            cyan: '#2cb67d', // Emerald Mint
+                            subtle: '#2e2f3e'
+                        }
+                    },
+                    boxShadow: {
+                        'glass': '0 8px 32px 0 rgba(31, 38, 135, 0.08)',
+                        'lux': '0 20px 40px -15px rgba(127, 90, 240, 0.12)',
+                        'gold-glow': '0 0 25px rgba(255, 137, 6, 0.18)'
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            background: #0d0c15; 
+            color: #1e293b; 
+        }
+        
+        /* Refined Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(243, 244, 246, 0.7); }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        #webgl-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; display: flex; }
+        
+        .interactive-panel { pointer-events: auto; }
+        
+        #drawing-board { 
+            background-color: white; 
+            box-shadow: 0 12px 30px -10px rgba(15, 23, 42, 0.15), 0 0 0 1px rgba(226, 232, 240, 0.8); 
+            cursor: crosshair;
+            touch-action: none;
+            border-radius: 12px;
+        }
+        
+        .view-section { 
+            display: none; 
+            width: 100%; 
+            height: 100%; 
+            overflow-y: auto; 
+            background: radial-gradient(circle at 10% 20%, rgba(255, 255, 255, 0.96) 0%, rgba(248, 250, 252, 0.94) 100%);
+            backdrop-filter: blur(20px); 
+        }
+        .view-section.active { display: flex; }
+        
+        #view-explore { background: transparent; backdrop-filter: none; }
+        
+        #crosshair {
+            position: absolute; top: 50%; left: 50%; width: 10px; height: 10px;
+            background: #ff8906; border: 2px solid #ffffff;
+            box-shadow: 0 0 12px rgba(255, 137, 6, 0.8);
+            border-radius: 50%; transform: translate(-50%, -50%);
+            pointer-events: none; z-index: 20; display: none;
+        }
+
+        /* Elegant Glass Card */
+        .lux-card {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+            box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.05), 0 8px 10px -6px rgba(15, 23, 42, 0.03);
+        }
+
+        .lux-btn {
+            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .lux-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 20px -8px rgba(127, 90, 240, 0.25);
+        }
+        .lux-btn:active {
+            transform: translateY(0);
+        }
+
+        @keyframes float-subtle {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-5px); }
+        }
+        .animate-float {
+            animation: float-subtle 4s ease-in-out infinite;
+        }
+
+        /* Elegant Grid Texture */
+        .ambient-grid {
+            background-image: radial-gradient(rgba(148, 163, 184, 0.2) 1px, transparent 1px);
+            background-size: 24px 24px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- WebGL Container -->
+    <div id="webgl-container"></div>
+    <div id="crosshair"></div>
+
+    <!-- UI Layer -->
+    <div id="ui-layer">
+        
+        <!-- Sidebar Navigation -->
+        <nav class="interactive-panel w-64 bg-white/90 backdrop-blur-xl border-r border-slate-200/80 flex flex-col h-full shadow-[4px_0_24px_rgba(15,23,42,0.04)] z-30 transition-transform duration-300 relative" id="sidebar">
+            
+            <!-- Header -->
+            <div class="px-5 py-5 border-b border-slate-100 flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-violet-600 via-indigo-600 to-rose-500 text-white flex items-center justify-center text-lg shadow-md shadow-violet-500/20">
+                    <i class="fa-solid fa-paintbrush"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-1.5">
+                        <span class="px-2 py-0.5 bg-amber-50 text-amber-700 text-[10px] font-semibold tracking-wide rounded-full border border-amber-200/60 font-sans">VIRTUAL 3D</span>
+                        <span class="flex h-1.5 w-1.5 relative">
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                        </span>
+                    </div>
+                    <h1 class="font-anime font-bold text-base tracking-wide text-slate-900 mt-0.5">ADM Gallery</h1>
+                    <p class="text-[10px] font-medium text-slate-400">Animation Drawing Museum</p>
+                </div>
+            </div>
+
+            <!-- Mini Mascot Mascot Bubble in Sidebar (Refined) -->
+            <div class="mx-3 mt-3 px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-violet-50/70 to-rose-50/50 border border-violet-100 flex items-center gap-3">
+                <div class="w-9 h-9 flex-shrink-0 animate-float">
+                    <svg viewBox="0 0 100 100" class="w-full h-full drop-shadow-sm">
+                        <!-- Hair Back -->
+                        <path d="M20,45 Q15,15 50,12 Q85,15 80,45 Z" fill="#ff4757"/>
+                        <!-- Head -->
+                        <ellipse cx="50" cy="50" rx="30" ry="28" fill="#ffeaa7"/>
+                        <!-- Hair Front -->
+                        <path d="M22,35 Q35,20 50,32 Q65,20 78,35 Q65,24 50,26 Q35,24 22,35 Z" fill="#ff6b81"/>
+                        <path d="M18,36 Q22,50 25,58 Q22,46 22,36 Z" fill="#ff4757"/>
+                        <path d="M82,36 Q78,50 75,58 Q78,46 82,36 Z" fill="#ff4757"/>
+                        <!-- Anime Eyes -->
+                        <ellipse cx="38" cy="48" rx="5" ry="7" fill="#2f3542"/>
+                        <ellipse cx="62" cy="48" rx="5" ry="7" fill="#2f3542"/>
+                        <circle cx="36" cy="45" r="2" fill="#ffffff"/>
+                        <circle cx="60" cy="45" r="2" fill="#ffffff"/>
+                        <ellipse cx="31" cy="54" rx="3.5" ry="1.8" fill="#ff7675" opacity="0.8"/>
+                        <ellipse cx="69" cy="54" rx="3.5" ry="1.8" fill="#ff7675" opacity="0.8"/>
+                        <path d="M46,55 Q50,59 54,55" fill="none" stroke="#2f3542" stroke-width="1.8" stroke-linecap="round"/>
+                        <path d="M30,22 Q50,6 72,18 Q80,24 66,28 Q45,30 30,22 Z" fill="#6366f1"/>
+                        <circle cx="53" cy="11" r="2.5" fill="#f59e0b"/>
+                    </svg>
+                </div>
+                <div class="leading-tight">
+                    <p class="text-[11px] font-bold text-slate-800">Kiko Navigator</p>
+                    <p class="text-[9.5px] text-slate-500">Eksplorasi seni animasi 3D</p>
+                </div>
+            </div>
+            
+            <div class="flex-1 py-3 px-3 space-y-1 overflow-y-auto">
+                <button onclick="App.switchView('home')" class="nav-btn w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-left text-xs font-semibold transition-all text-slate-600 hover:bg-slate-100 hover:text-slate-900" data-target="home">
+                    <div class="w-7 h-7 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center text-xs">
+                        <i class="fa-solid fa-house"></i>
+                    </div>
+                    <span>Beranda Utama</span>
+                </button>
+
+                <button onclick="App.switchView('explore')" class="nav-btn w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-left text-xs font-semibold transition-all text-slate-600 hover:bg-slate-100 hover:text-slate-900" data-target="explore">
+                    <div class="w-7 h-7 rounded-lg bg-violet-50 text-violet-600 flex items-center justify-center text-xs">
+                        <i class="fa-solid fa-cube"></i>
+                    </div>
+                    <span>Jelajahi Museum 3D</span>
+                </button>
+
+                <button onclick="App.switchView('studio')" class="nav-btn w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-left text-xs font-semibold transition-all text-slate-600 hover:bg-slate-100 hover:text-slate-900" data-target="studio">
+                    <div class="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center text-xs">
+                        <i class="fa-solid fa-pen-nib"></i>
+                    </div>
+                    <span>Studio Gambar</span>
+                </button>
+
+                <button onclick="App.switchView('upload')" class="nav-btn w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-left text-xs font-semibold transition-all text-slate-600 hover:bg-slate-100 hover:text-slate-900" data-target="upload">
+                    <div class="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-xs">
+                        <i class="fa-solid fa-cloud-arrow-up"></i>
+                    </div>
+                    <span>Unggah Karya</span>
+                </button>
+
+                <button onclick="App.switchView('curate')" class="nav-btn w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-left text-xs font-semibold transition-all text-slate-600 hover:bg-slate-100 hover:text-slate-900" data-target="curate">
+                    <div class="w-7 h-7 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center text-xs">
+                        <i class="fa-solid fa-layer-group"></i>
+                    </div>
+                    <span>Kurasi Dinding</span>
+                </button>
+            </div>
+            
+            <!-- Creator Badge with Elegant Minimalist Style -->
+            <div class="p-3 mx-3 mb-4 rounded-xl bg-gradient-to-b from-slate-50 to-white border border-slate-200/90 text-center relative overflow-hidden shadow-sm">
+                <span class="inline-block px-2 py-0.5 rounded-md bg-slate-900 text-amber-300 text-[9px] font-bold uppercase tracking-wider mb-1">
+                    Creator & Architect
+                </span>
+                <p class="text-[10px] text-slate-400 font-medium">System by :</p>
+                <p class="text-xs font-bold text-slate-900 tracking-tight mt-0.5">Ferdiyudiman, S.Kom, M.Kom</p>
+                <div class="mt-1.5 pt-1.5 border-t border-slate-100 flex items-center justify-center gap-1 text-[9px] text-slate-400 font-medium">
+                    <i class="fa-solid fa-gem text-amber-500 text-[8px]"></i> 3D Virtual Art Pavilion
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 relative overflow-hidden ambient-grid">
+            
+            <!-- View: Home (Adjusted to be compact, elegant & balanced) -->
+            <div id="view-home" class="view-section active interactive-panel flex-col items-center justify-center p-6 md:p-8 text-center relative">
+                
+                <div class="max-w-3xl w-full flex flex-col items-center relative z-10 py-2">
+                    
+                    <!-- Header Pill & Subtitle -->
+                    <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/90 border border-slate-200/80 shadow-sm text-slate-700 text-xs font-semibold mb-4">
+                        <span class="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
+                        <span class="text-slate-500 font-normal">Pameran Seni Digital</span>
+                        <span class="text-slate-300">•</span>
+                        <span class="text-violet-700 font-bold">Interactive WebGL</span>
+                    </div>
+
+                    <!-- Hero Mascot Character (Proportional & Subtle) -->
+                    <div class="relative mb-4">
+                        <div class="w-20 h-20 md:w-24 md:h-24 rounded-2xl bg-gradient-to-tr from-violet-600 via-indigo-600 to-rose-400 p-1.5 shadow-lux animate-float flex items-center justify-center border border-white/60">
+                            <!-- Chibi Character with Refined Color Palette -->
+                            <svg viewBox="0 0 160 160" class="w-full h-full drop-shadow">
+                                <defs>
+                                    <linearGradient id="skin" x1="0%" y1="0%" x2="100%" y2="100%">
+                                        <stop offset="0%" stop-color="#ffeaa7"/>
+                                        <stop offset="100%" stop-color="#fdcb6e"/>
+                                    </linearGradient>
+                                    <linearGradient id="hairGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                        <stop offset="0%" stop-color="#ff4757"/>
+                                        <stop offset="100%" stop-color="#eb2f06"/>
+                                    </linearGradient>
+                                    <linearGradient id="jacket" x1="0%" y1="0%" x2="100%" y2="100%">
+                                        <stop offset="0%" stop-color="#10b981"/>
+                                        <stop offset="100%" stop-color="#059669"/>
+                                    </linearGradient>
+                                </defs>
+                                <ellipse cx="80" cy="148" rx="42" ry="7" fill="#0f172a" opacity="0.25"/>
+                                <path d="M30,70 L15,40 L45,48 L50,18 L75,38 L95,15 L108,42 L138,32 L125,72 Z" fill="url(#hairGrad)"/>
+                                <path d="M45,120 Q80,110 115,120 L125,148 L35,148 Z" fill="url(#jacket)"/>
+                                <path d="M50,110 Q80,126 110,110 Q80,98 50,110 Z" fill="#fbbf24"/>
+                                <ellipse cx="80" cy="80" rx="40" ry="36" fill="url(#skin)"/>
+                                <circle cx="36" cy="82" r="7" fill="#ffeaa7"/>
+                                <circle cx="124" cy="82" r="7" fill="#ffeaa7"/>
+                                <ellipse cx="63" cy="78" rx="9" ry="12" fill="#0f172a"/>
+                                <ellipse cx="97" cy="78" rx="9" ry="12" fill="#0f172a"/>
+                                <ellipse cx="63" cy="80" rx="7" ry="9" fill="#06b6d4"/>
+                                <ellipse cx="97" cy="80" rx="7" ry="9" fill="#06b6d4"/>
+                                <circle cx="60" cy="74" r="4" fill="#ffffff"/>
+                                <circle cx="94" cy="74" r="4" fill="#ffffff"/>
+                                <ellipse cx="52" cy="89" rx="6" ry="2.5" fill="#f43f5e" opacity="0.8"/>
+                                <ellipse cx="108" cy="89" rx="6" ry="2.5" fill="#f43f5e" opacity="0.8"/>
+                                <path d="M72,92 Q80,102 88,92" fill="#f43f5e" stroke="#0f172a" stroke-width="2.5" stroke-linecap="round"/>
+                                <path d="M40,55 Q55,75 68,52 Q82,75 92,54 Q105,72 120,55 Q100,35 80,35 Q55,35 40,55 Z" fill="url(#hairGrad)"/>
+                            </svg>
+                        </div>
+                        <span class="absolute -bottom-1 -right-2 px-2.5 py-0.5 bg-amber-400 text-slate-900 font-bold text-[10px] rounded-full shadow-sm border border-white">
+                            ★ Curated
+                        </span>
+                    </div>
+                    
+                    <h2 class="text-2xl md:text-4xl font-anime font-black text-slate-900 tracking-tight leading-snug mb-2">
+                        Animation Drawing <br class="hidden md:block">
+                        <span class="text-transparent bg-clip-text bg-gradient-to-r from-violet-600 via-indigo-600 to-rose-500">
+                            Museum 3D Experience
+                        </span>
+                    </h2>
+                    
+                    <!-- Creator Badge -->
+                    <div class="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-900 text-white rounded-lg shadow-sm mb-3">
+                        <span class="text-[10px] font-medium text-slate-400">Developed by :</span>
+                        <span class="text-xs font-bold text-amber-300">Ferdiyudiman, S.Kom, M.Kom</span>
+                    </div>
+
+                    <p class="text-xs md:text-sm text-slate-600 max-w-xl mb-6 leading-relaxed font-normal">
+                        Jelajahi galeri virtual bergaya kontemporer, gambar sketsa karakter di studio interaktif, dan pamerkan portofolio seni manual animasi pada bingkai dinding 3D secara imersif.
+                    </p>
+
+                    <!-- Elegant Action Buttons -->
+                    <div class="flex flex-wrap justify-center gap-3 mb-6">
+                        <button onclick="App.switchView('explore')" class="lux-btn px-6 py-3 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white rounded-xl font-semibold text-xs md:text-sm shadow-md flex items-center gap-2.5">
+                            <i class="fa-solid fa-cube text-amber-300"></i> 
+                            <span>Eksplorasi Galeri 3D</span>
+                        </button>
+                        <button onclick="App.switchView('studio')" class="lux-btn px-6 py-3 bg-white hover:bg-slate-50 text-slate-800 border border-slate-200/90 rounded-xl font-semibold text-xs md:text-sm shadow-sm flex items-center gap-2.5">
+                            <i class="fa-solid fa-pen-nib text-violet-600"></i>
+                            <span>Buka Studio Gambar</span>
+                        </button>
+                    </div>
+
+                    <!-- Proportional Quick Feature Highlights -->
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-2.5 w-full max-w-2xl">
+                        <div class="p-2.5 bg-white/70 rounded-xl border border-slate-200/70 shadow-sm flex items-center gap-2.5 text-left">
+                            <span class="w-8 h-8 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center text-xs font-bold"><i class="fa-solid fa-person-walking"></i></span>
+                            <div class="leading-tight">
+                                <p class="text-[11px] font-bold text-slate-900">Walkthrough</p>
+                                <p class="text-[9.5px] text-slate-400">WASD & Mouse</p>
+                            </div>
+                        </div>
+                        <div class="p-2.5 bg-white/70 rounded-xl border border-slate-200/70 shadow-sm flex items-center gap-2.5 text-left">
+                            <span class="w-8 h-8 rounded-lg bg-violet-50 text-violet-600 flex items-center justify-center text-xs font-bold"><i class="fa-solid fa-pen-ruler"></i></span>
+                            <div class="leading-tight">
+                                <p class="text-[11px] font-bold text-slate-900">Live Studio</p>
+                                <p class="text-[9.5px] text-slate-400">Brush & Sketsa</p>
+                            </div>
+                        </div>
+                        <div class="p-2.5 bg-white/70 rounded-xl border border-slate-200/70 shadow-sm flex items-center gap-2.5 text-left">
+                            <span class="w-8 h-8 rounded-lg bg-cyan-50 text-cyan-600 flex items-center justify-center text-xs font-bold"><i class="fa-solid fa-cloud-arrow-up"></i></span>
+                            <div class="leading-tight">
+                                <p class="text-[11px] font-bold text-slate-900">Upload Art</p>
+                                <p class="text-[9.5px] text-slate-400">PNG / JPG / WebP</p>
+                            </div>
+                        </div>
+                        <div class="p-2.5 bg-white/70 rounded-xl border border-slate-200/70 shadow-sm flex items-center gap-2.5 text-left">
+                            <span class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-xs font-bold"><i class="fa-solid fa-border-all"></i></span>
+                            <div class="leading-tight">
+                                <p class="text-[11px] font-bold text-slate-900">Kurasi 3D</p>
+                                <p class="text-[9.5px] text-slate-400">Slot Pajangan</p>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- View: Explore (3D Overlay) -->
+            <div id="view-explore" class="view-section flex-col interactive-panel pointer-events-none">
+                <!-- Top UI overlay for 3D -->
+                <div class="absolute top-4 left-4 right-4 flex flex-wrap justify-between items-start gap-3 pointer-events-none">
+                    <div class="lux-card px-4 py-2.5 rounded-xl pointer-events-auto flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-lg bg-violet-600 flex items-center justify-center text-white text-sm shadow-sm">
+                            <i class="fa-solid fa-compass"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-anime font-bold text-slate-900 text-xs leading-tight">Pavilion 3D</h3>
+                            <p class="text-[10px] text-slate-500">Navigasi: <kbd class="bg-slate-100 border border-slate-300 rounded px-1 text-[9px] font-bold">W A S D</kbd> • Putar: Seret Mouse</p>
+                        </div>
+                    </div>
+                    
+                    <button id="btn-enter-fps" class="lux-btn px-4 py-2 rounded-xl text-xs font-bold text-slate-900 bg-amber-400 hover:bg-amber-300 pointer-events-auto shadow-sm flex items-center gap-1.5">
+                        <i class="fa-solid fa-crosshairs text-rose-600 text-sm"></i> Kunci Mouse (Mode Imersif)
+                    </button>
+                </div>
+                
+                <!-- Bottom UI with Tip -->
+                <div class="absolute bottom-4 left-1/2 transform -translate-x-1/2 pointer-events-none w-11/12 max-w-md">
+                    <div class="lux-card px-4 py-2 rounded-xl flex items-center justify-between pointer-events-auto text-xs text-slate-600 font-medium shadow-sm">
+                        <span class="flex items-center gap-1.5"><i class="fa-solid fa-computer-mouse text-violet-600"></i> Seret Mouse untuk Menoleh</span>
+                        <span class="flex items-center gap-1.5"><i class="fa-solid fa-hand-pointer text-rose-500"></i> Klik Lukisan untuk Detail</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- View: Studio -->
+            <div id="view-studio" class="view-section interactive-panel bg-slate-50 flex-col h-full">
+                <!-- Studio Top Bar -->
+                <div class="border-b border-slate-200/80 bg-white/90 backdrop-blur-md px-4 md:px-5 py-2.5 flex justify-between items-center z-10 flex-wrap gap-2">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-8 h-8 rounded-lg bg-gradient-to-r from-violet-600 to-rose-500 text-white flex items-center justify-center text-sm shadow-sm">
+                            <i class="fa-solid fa-paint-brush"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-sm font-bold text-slate-900">Studio Gambar Animasi</h2>
+                            <p class="text-[10px] text-slate-400">Sketsa karakter, pose gerak & storyboard</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                        <button onclick="StudioEngine.undo()" class="p-2 bg-white text-slate-600 hover:bg-slate-100 rounded-lg border border-slate-200 text-xs transition-colors" title="Undo"><i class="fa-solid fa-rotate-left"></i></button>
+                        <button onclick="StudioEngine.redo()" class="p-2 bg-white text-slate-600 hover:bg-slate-100 rounded-lg border border-slate-200 text-xs transition-colors" title="Redo"><i class="fa-solid fa-rotate-right"></i></button>
+                        <div class="w-px h-5 bg-slate-200 mx-1"></div>
+                        <button onclick="StudioEngine.clearCanvas()" class="p-2 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg border border-rose-200 text-xs transition-colors" title="Bersihkan Kanvas"><i class="fa-solid fa-trash"></i></button>
+                        
+                        <div class="w-px h-5 bg-slate-200 mx-1"></div>
+                        
+                        <!-- Toggle Button for Metadata Panel -->
+                        <button id="btn-toggle-metadata" onclick="StudioEngine.toggleMetadataPanel()" class="px-3 py-1.5 bg-violet-50 hover:bg-violet-100 text-violet-700 font-semibold rounded-lg border border-violet-200/80 text-xs flex items-center gap-1.5 transition-colors shadow-xs" title="Tampilkan / Sembunyikan Metadata Karya">
+                            <i class="fa-solid fa-file-pen text-violet-600"></i>
+                            <span id="btn-toggle-metadata-text" class="hidden sm:inline">Tutup Metadata</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="flex flex-1 overflow-hidden relative">
+                    <!-- Toolbox -->
+                    <div class="w-16 bg-white border-r border-slate-200/80 flex flex-col items-center py-4 gap-2.5 z-10">
+                        <button onclick="StudioEngine.setTool('brush')" id="tool-brush" class="w-10 h-10 rounded-xl bg-violet-600 text-white flex flex-col items-center justify-center text-xs shadow-sm transition-all" title="Kuas Warna">
+                            <i class="fa-solid fa-paint-brush"></i>
+                        </button>
+                        <button onclick="StudioEngine.setTool('pencil')" id="tool-pencil" class="w-10 h-10 rounded-xl bg-slate-50 text-slate-600 hover:bg-slate-100 flex flex-col items-center justify-center text-xs border border-slate-200 transition-all" title="Pensil Sketsa">
+                            <i class="fa-solid fa-pencil"></i>
+                        </button>
+                        <button onclick="StudioEngine.setTool('eraser')" id="tool-eraser" class="w-10 h-10 rounded-xl bg-slate-50 text-slate-600 hover:bg-rose-50 flex flex-col items-center justify-center text-xs border border-slate-200 transition-all" title="Penghapus">
+                            <i class="fa-solid fa-eraser"></i>
+                        </button>
+                        
+                        <div class="w-8 h-px bg-slate-200 my-1"></div>
+                        
+                        <div class="relative">
+                            <input type="color" id="color-picker" value="#1e293b" class="w-8 h-8 rounded-lg cursor-pointer border border-slate-300 p-0 shadow-sm" onchange="StudioEngine.setColor(this.value)">
+                        </div>
+                        
+                        <!-- Quick Palette -->
+                        <div class="grid grid-cols-2 gap-1 px-1 mt-1">
+                            <button onclick="StudioEngine.setColor('#0f172a')" class="w-3.5 h-3.5 rounded bg-[#0f172a] border border-slate-300"></button>
+                            <button onclick="StudioEngine.setColor('#ef4444')" class="w-3.5 h-3.5 rounded bg-[#ef4444] border border-slate-300"></button>
+                            <button onclick="StudioEngine.setColor('#10b981')" class="w-3.5 h-3.5 rounded bg-[#10b981] border border-slate-300"></button>
+                            <button onclick="StudioEngine.setColor('#3b82f6')" class="w-3.5 h-3.5 rounded bg-[#3b82f6] border border-slate-300"></button>
+                        </div>
+                        
+                        <div class="flex flex-col items-center gap-1 w-full px-1.5 mt-2 text-[9px] font-bold text-slate-500">
+                            <span>Tebal</span>
+                            <input type="range" id="size-slider" min="1" max="50" value="6" class="w-11 accent-violet-600" onchange="StudioEngine.setSize(this.value)">
+                        </div>
+                    </div>
+                    
+                    <!-- Canvas Drawing Area -->
+                    <div id="drawing-area-container" class="flex-1 bg-slate-100 p-4 md:p-6 overflow-auto flex items-center justify-center relative transition-all duration-300">
+                        <div class="relative">
+                            <canvas id="drawing-board" width="800" height="600" class="rounded-xl"></canvas>
+                        </div>
+
+                        <!-- Floating Quick Toggle Button when Metadata is collapsed -->
+                        <button id="floating-open-metadata" onclick="StudioEngine.toggleMetadataPanel()" class="hidden absolute top-4 right-4 z-20 px-3 py-1.5 bg-white/90 hover:bg-white text-slate-700 hover:text-violet-700 rounded-lg shadow-md border border-slate-200/90 text-xs font-semibold items-center gap-1.5 transition-all backdrop-blur-md">
+                            <i class="fa-solid fa-bookmark text-violet-600"></i>
+                            <span>Buka Metadata</span>
+                        </button>
+                    </div>
+                    
+                    <!-- Save & Metadata Panel (Collapsible) -->
+                    <div id="studio-metadata-panel" class="w-72 bg-white border-l border-slate-200/80 p-5 flex flex-col gap-3.5 overflow-y-auto z-10 transition-all duration-300 ease-in-out shrink-0">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                            <div class="flex items-center gap-2">
+                                <i class="fa-solid fa-bookmark text-violet-600 text-sm"></i>
+                                <h3 class="font-bold text-slate-900 text-xs uppercase tracking-wider">Metadata Karya</h3>
+                            </div>
+                            <!-- Close Button in Header of Panel -->
+                            <button onclick="StudioEngine.toggleMetadataPanel()" class="w-6 h-6 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center text-xs transition-colors" title="Sembunyikan Panel">
+                                <i class="fa-solid fa-chevron-right"></i>
+                            </button>
+                        </div>
+
+                        <div class="space-y-3 flex-1 text-xs">
+                            <div>
+                                <label class="block font-semibold text-slate-700 mb-1">Judul Karya <span class="text-rose-500">*</span></label>
+                                <input type="text" id="studio-title" class="w-full border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-violet-500 text-xs" placeholder="Misal: Chibi Adventurer">
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-slate-700 mb-1">Nama Seniman <span class="text-rose-500">*</span></label>
+                                <input type="text" id="studio-artist" class="w-full border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-violet-500 text-xs" placeholder="Nama kreator">
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-slate-700 mb-1">Kategori</label>
+                                <select id="studio-category" class="w-full border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-violet-500 text-xs bg-white">
+                                    <option value="Sketsa Animasi">Sketsa Animasi (Sketch)</option>
+                                    <option value="Desain Karakter">Desain Karakter</option>
+                                    <option value="Storyboard">Storyboard & Sequence</option>
+                                    <option value="Gesture Drawing">Gesture Drawing</option>
+                                    <option value="Ilustrasi Bebas">Ilustrasi Bebas</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-slate-700 mb-1">Catatan Konsep</label>
+                                <textarea id="studio-desc" rows="3" class="w-full border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-violet-500 resize-none text-xs" placeholder="Deskripsi ringkas konsep atau teknik..."></textarea>
+                            </div>
+                        </div>
+
+                        <button onclick="StudioEngine.saveArtwork()" class="lux-btn w-full py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-semibold rounded-xl text-xs shadow-md flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-floppy-disk text-amber-300"></i> Simpan ke Koleksi
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- View: Upload -->
+            <div id="view-upload" class="view-section interactive-panel p-6 md:p-8 items-center justify-center">
+                <div class="bg-white rounded-2xl shadow-lux w-full max-w-3xl flex flex-col md:flex-row overflow-hidden border border-slate-200/80">
+                    
+                    <div class="md:w-1/2 bg-slate-50 p-6 flex flex-col items-center justify-center border-b md:border-b-0 md:border-r border-slate-200/80">
+                        <div id="upload-preview-container" class="w-full aspect-[4/3] rounded-xl border-2 border-dashed border-slate-300 bg-white flex flex-col items-center justify-center relative overflow-hidden group cursor-pointer hover:border-violet-500 transition-colors" onclick="document.getElementById('file-upload').click()">
+                            
+                            <img id="upload-preview-img" class="absolute inset-0 w-full h-full object-contain hidden" src="" alt="Preview">
+                            
+                            <div id="upload-placeholder" class="text-center p-4">
+                                <div class="w-12 h-12 bg-violet-50 text-violet-600 rounded-xl flex items-center justify-center text-xl mx-auto mb-2 border border-violet-100">
+                                    <i class="fa-solid fa-cloud-arrow-up"></i>
+                                </div>
+                                <h4 class="font-bold text-slate-800 text-xs">Pilih Berkas Karya</h4>
+                                <p class="text-[10px] text-slate-400 mt-0.5">PNG, JPG, WebP (Maks 5MB)</p>
+                            </div>
+                            
+                            <div id="upload-overlay" class="absolute inset-0 bg-slate-900/60 hidden flex-col items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity text-xs font-semibold">
+                                <i class="fa-solid fa-pen mb-1"></i> Ganti Gambar
+                            </div>
+                        </div>
+                        <input type="file" id="file-upload" accept="image/png, image/jpeg, image/webp" class="hidden" onchange="ArtworkManager.handleFileUpload(event)">
+                    </div>
+                    
+                    <div class="md:w-1/2 p-6 flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center gap-2 mb-3 pb-2 border-b border-slate-100">
+                                <i class="fa-solid fa-file-signature text-violet-600 text-sm"></i>
+                                <h2 class="text-sm font-bold text-slate-900">Detail & Kurasi</h2>
+                            </div>
+
+                            <div class="space-y-2.5 text-xs">
+                                <div>
+                                    <label class="block font-semibold text-slate-700 mb-1">Judul Karya <span class="text-rose-500">*</span></label>
+                                    <input type="text" id="upload-title" class="w-full border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-violet-500" placeholder="Judul lukisan / gambar">
+                                </div>
+                                <div class="flex gap-2">
+                                    <div class="flex-1">
+                                        <label class="block font-semibold text-slate-700 mb-1">Nama Seniman <span class="text-rose-500">*</span></label>
+                                        <input type="text" id="upload-artist" class="w-full border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-violet-500" placeholder="Nama kreator">
+                                    </div>
+                                    <div class="w-20">
+                                        <label class="block font-semibold text-slate-700 mb-1">Tahun</label>
+                                        <input type="text" id="upload-year" class="w-full border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-violet-500" value="2026">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block font-semibold text-slate-700 mb-1">Kategori</label>
+                                    <select id="upload-category" class="w-full border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-violet-500 bg-white">
+                                        <option value="Sketsa Animasi">Sketsa Animasi</option>
+                                        <option value="Desain Karakter">Desain Karakter</option>
+                                        <option value="Desain Lingkungan">Desain Latar</option>
+                                        <option value="Storyboard">Storyboard</option>
+                                        <option value="Ilustrasi Bebas">Ilustrasi Digital</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block font-semibold text-slate-700 mb-1">Deskripsi</label>
+                                    <textarea id="upload-desc" rows="2" class="w-full border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-violet-500 resize-none" placeholder="Catatan karya..."></textarea>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button onclick="ArtworkManager.saveUploadedArtwork()" class="lux-btn mt-4 w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-semibold rounded-xl text-xs shadow-sm flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-circle-check text-emerald-400"></i> Tambahkan ke Galeri
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- View: Curate -->
+            <div id="view-curate" class="view-section interactive-panel p-6 md:p-8 flex-col">
+                <div class="mb-4 flex flex-wrap justify-between items-center gap-3">
+                    <div>
+                        <h2 class="text-xl font-bold text-slate-900">Kurasi & Penataan Dinding</h2>
+                        <p class="text-slate-500 text-xs">Atur penempatan karya pada slot bingkai di ruangan museum 3D.</p>
+                    </div>
+
+                    <button onclick="GalleryEngine.applyChanges()" class="lux-btn px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl text-xs shadow-sm flex items-center gap-2">
+                        <i class="fa-solid fa-arrows-rotate"></i> Terapkan ke 3D
+                    </button>
+                </div>
+                
+                <div class="flex flex-col md:flex-row gap-5 flex-1 overflow-hidden">
+                    <!-- Available Artworks -->
+                    <div class="md:w-1/2 flex flex-col bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
+                        <div class="p-3 bg-slate-50 border-b border-slate-200/80 flex items-center justify-between">
+                            <h3 class="font-bold text-slate-800 text-xs"><i class="fa-solid fa-palette text-violet-600 mr-1.5"></i> Koleksi Tersedia</h3>
+                            <span class="text-[10px] text-slate-400">Seret ke slot dinding</span>
+                        </div>
+                        <div id="collection-grid" class="flex-1 p-3 grid grid-cols-2 gap-3 overflow-y-auto content-start bg-slate-50/50">
+                            <!-- Injected by JS -->
+                        </div>
+                    </div>
+                    
+                    <!-- Museum Wall Slots -->
+                    <div class="md:w-1/2 flex flex-col bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
+                        <div class="p-3 bg-slate-50 border-b border-slate-200/80 flex justify-between items-center">
+                            <h3 class="font-bold text-slate-800 text-xs"><i class="fa-solid fa-border-all text-amber-600 mr-1.5"></i> Slot Dinding Museum</h3>
+                            <span class="text-[10px] text-slate-400">Total 11 Slot</span>
+                        </div>
+                        <div id="slots-list" class="flex-1 p-3 flex flex-col gap-2 overflow-y-auto bg-slate-50/50">
+                            <!-- Injected by JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Modal: Artwork Detail (Overlay inside 3D) -->
+    <div id="modal-artwork" class="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-50 flex items-center justify-center opacity-0 pointer-events-none transition-opacity duration-300 p-4">
+        <div class="bg-white rounded-2xl w-full max-w-4xl max-h-[85vh] flex flex-col md:flex-row overflow-hidden shadow-2xl border border-slate-200 transform scale-95 transition-transform duration-300" id="modal-artwork-content">
+            <div class="md:w-2/3 bg-slate-900 p-6 flex items-center justify-center relative">
+                <img id="detail-image" src="" alt="Artwork" class="max-w-full max-h-[60vh] object-contain rounded-lg shadow-xl">
+                <button onclick="UI.closeDetailModal()" class="absolute top-4 left-4 w-9 h-9 bg-white/90 hover:bg-white rounded-xl flex items-center justify-center text-slate-900 shadow-md font-bold text-xs transition-all">
+                    <i class="fa-solid fa-arrow-left"></i>
+                </button>
+            </div>
+            <div class="md:w-1/3 bg-white p-6 flex flex-col justify-between">
+                <div>
+                    <span class="inline-block px-2.5 py-0.5 bg-violet-50 text-violet-700 text-[10px] font-bold rounded-md uppercase tracking-wider mb-2 border border-violet-100" id="detail-category">Kategori</span>
+                    <h2 class="text-xl font-bold text-slate-900 mb-1 leading-snug" id="detail-title">Judul Karya</h2>
+                    <p class="text-xs text-rose-500 font-semibold mb-3">
+                        <span id="detail-artist">Nama Seniman</span> 
+                        <span class="text-slate-400 ml-1" id="detail-year">(2026)</span>
+                    </p>
+                    
+                    <div class="w-10 h-0.5 bg-slate-200 mb-3"></div>
+                    
+                    <h4 class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Catatan Kreatif</h4>
+                    <p class="text-slate-600 text-xs leading-relaxed font-normal" id="detail-desc">Deskripsi karya.</p>
+                </div>
+                
+                <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
+                    <span>ADM 3D Gallery</span>
+                    <button onclick="UI.closeDetailModal()" class="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-semibold rounded-lg text-xs">
+                        Tutup
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Message/Alert -->
+    <div id="modal-message" class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-[60] flex items-center justify-center opacity-0 pointer-events-none transition-opacity p-4">
+        <div class="bg-white rounded-2xl w-full max-w-sm p-5 text-center shadow-2xl border border-slate-200 transform scale-95 transition-transform" id="modal-message-content">
+            <div id="msg-icon" class="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 text-xl flex items-center justify-center mx-auto mb-3 border border-amber-100">
+                <i class="fa-solid fa-bell"></i>
+            </div>
+            <h3 id="msg-title" class="text-base font-bold text-slate-900 mb-1">Pemberitahuan</h3>
+            <p id="msg-text" class="text-slate-500 text-xs mb-4">Pesan detail.</p>
+            <button onclick="UI.closeMessage()" class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold rounded-xl text-xs w-full shadow-sm">
+                Mengerti
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Logic -->
+    <script>
+        /**
+         * ANIMATION DRAWING MUSEUM 3D
+         * Core Engine & State Management
+         */
+        
+        // --- 1. DATA STATE & STORAGE ---
+        const State = {
+            artworks: [], // {id, title, artist, year, category, desc, imageBase64}
+            placements: {}, // { slotId: artworkId }
+            selectedArtworkForCuration: null
+        };
+
+        const StorageAdapter = {
+            init() {
+                const savedArt = localStorage.getItem('adm_artworks');
+                const savedPlace = localStorage.getItem('adm_placements');
+                
+                if (savedArt) State.artworks = JSON.parse(savedArt);
+                if (savedPlace) State.placements = JSON.parse(savedPlace);
+
+                // Setup default artworks if empty to showcase MVP
+                if (State.artworks.length === 0) {
+                    this.loadDefaultData();
+                }
+            },
+            saveArtworks() {
+                try {
+                    localStorage.setItem('adm_artworks', JSON.stringify(State.artworks));
+                    return true;
+                } catch (e) {
+                    UI.showMessage('Penyimpanan Penuh', 'Kapasitas penyimpanan lokal telah habis. Gagal menyimpan karya baru.', 'error');
+                    return false;
+                }
+            },
+            savePlacements() {
+                localStorage.setItem('adm_placements', JSON.stringify(State.placements));
+            },
+            loadDefaultData() {
+                // Creates a simple placeholder image programmatically to avoid external dependency issues
+                const canvas = document.createElement('canvas');
+                canvas.width = 800; canvas.height = 600;
+                const ctx = canvas.getContext('2d');
+                
+                // Draw a simple landscape sketch programmatically
+                ctx.fillStyle = '#f0f0f0'; ctx.fillRect(0,0,800,600);
+                ctx.strokeStyle = '#333'; ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(400, 300, 100, 0, Math.PI*2); // circle
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(100, 500); ctx.lineTo(300, 200); ctx.lineTo(500, 400); ctx.lineTo(700, 250); ctx.lineTo(800, 500);
+                ctx.stroke(); // mountains
+                
+                const defaultImg = canvas.toDataURL('image/jpeg', 0.8);
+                
+                const sample = {
+                    id: 'art-001',
+                    title: 'Studi Lanskap Awal',
+                    artist: 'Kurator Museum',
+                    year: '2026',
+                    category: 'Sketsa',
+                    desc: 'Karya contoh untuk menguji tata letak bingkai di dalam ruang galeri 3D.',
+                    imageBase64: defaultImg
+                };
+                
+                State.artworks.push(sample);
+                State.placements['s1'] = 'art-001';
+                State.placements['s5'] = 'art-001';
+                
+                this.saveArtworks();
+                this.savePlacements();
+            }
+        };
+
+
+        // --- 2. UI CONTROLLER ---
+        const UI = {
+            currentView: 'home',
+            init() {
+                // Update nav buttons visually
+                document.querySelectorAll('.nav-btn').forEach(btn => {
+                    if (btn.dataset.target === this.currentView) {
+                        btn.classList.add('bg-violet-100', 'text-violet-700', 'border-r-4', 'border-violet-600');
+                        btn.classList.remove('text-slate-700');
+                    }
+                });
+            },
+            switchView(viewName) {
+                // Pause 3D controls if leaving explore
+                if (this.currentView === 'explore' && viewName !== 'explore') {
+                    MuseumEngine.pause();
+                }
+
+                // Hide all views
+                document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+                
+                // Show target view
+                const targetEl = document.getElementById(`view-${viewName}`);
+                if(targetEl) targetEl.classList.add('active');
+                
+                // Update Sidebar style
+                document.querySelectorAll('.nav-btn').forEach(btn => {
+                    btn.classList.remove('bg-violet-100', 'text-violet-700', 'border-r-4', 'border-violet-600');
+                    btn.classList.add('text-slate-700');
+                    
+                    if(btn.dataset.target === viewName) {
+                        btn.classList.add('bg-violet-100', 'text-violet-700', 'border-r-4', 'border-violet-600');
+                        btn.classList.remove('text-slate-700');
+                    }
+                });
+
+                this.currentView = viewName;
+
+                // Specific view initializations
+                if (viewName === 'explore') {
+                    MuseumEngine.resume();
+                } else if (viewName === 'curate') {
+                    GalleryEngine.renderCurateUI();
+                } else if (viewName === 'studio') {
+                    // Beri jeda sedikit agar DOM selesai merender display:flex sebelum menghitung ukuran kanvas
+                    setTimeout(() => StudioEngine.resizeCanvas(), 50);
+                }
+            },
+            showMessage(title, text, type = 'info') {
+                const modal = document.getElementById('modal-message');
+                const content = document.getElementById('modal-message-content');
+                document.getElementById('msg-title').innerText = title;
+                document.getElementById('msg-text').innerText = text;
+                
+                const icon = document.getElementById('msg-icon');
+                if (type === 'error') {
+                    icon.className = 'w-16 h-16 rounded-2xl bg-rose-100 text-rose-500 text-3xl flex items-center justify-center mx-auto mb-4 border-2 border-slate-900 shadow-comic animate-mascot';
+                    icon.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>';
+                } else if (type === 'success') {
+                    icon.className = 'w-16 h-16 rounded-2xl bg-emerald-100 text-emerald-600 text-3xl flex items-center justify-center mx-auto mb-4 border-2 border-slate-900 shadow-comic animate-mascot';
+                    icon.innerHTML = '<i class="fa-solid fa-check"></i>';
+                } else {
+                    icon.className = 'w-16 h-16 rounded-2xl bg-amber-100 text-museum-accent text-3xl flex items-center justify-center mx-auto mb-4 border-2 border-slate-900 shadow-comic animate-mascot';
+                    icon.innerHTML = '<i class="fa-solid fa-bell"></i>';
+                }
+
+                modal.classList.remove('opacity-0', 'pointer-events-none');
+                content.classList.remove('scale-95');
+                content.classList.add('scale-100');
+            },
+            closeMessage() {
+                const modal = document.getElementById('modal-message');
+                const content = document.getElementById('modal-message-content');
+                modal.classList.add('opacity-0', 'pointer-events-none');
+                content.classList.remove('scale-100');
+                content.classList.add('scale-95');
+            },
+            showDetailModal(artworkId) {
+                const art = State.artworks.find(a => a.id === artworkId);
+                if (!art) return;
+                
+                document.getElementById('detail-image').src = art.imageBase64;
+                document.getElementById('detail-title').innerText = art.title;
+                document.getElementById('detail-artist').innerText = art.artist;
+                document.getElementById('detail-year').innerText = `(${art.year})`;
+                document.getElementById('detail-category').innerText = art.category;
+                document.getElementById('detail-desc').innerText = art.desc || 'Tidak ada deskripsi.';
+
+                const modal = document.getElementById('modal-artwork');
+                const content = document.getElementById('modal-artwork-content');
+                
+                // Disable 3D movement when viewing details
+                MuseumEngine.isDetailViewOpen = true;
+
+                modal.classList.remove('opacity-0', 'pointer-events-none');
+                content.classList.remove('scale-95');
+                content.classList.add('scale-100');
+            },
+            closeDetailModal() {
+                const modal = document.getElementById('modal-artwork');
+                const content = document.getElementById('modal-artwork-content');
+                modal.classList.add('opacity-0', 'pointer-events-none');
+                content.classList.remove('scale-100');
+                content.classList.add('scale-95');
+                
+                setTimeout(() => {
+                    MuseumEngine.isDetailViewOpen = false;
+                }, 300);
+            }
+        };
+
+
+        // --- 3. 3D MUSEUM ENGINE (THREE.JS) ---
+        const MuseumEngine = {
+            scene: null, camera: null, renderer: null,
+            frames: [], slotsConfig: [],
+            yaw: 0, pitch: 0,
+            keys: { w:false, a:false, s:false, d:false },
+            isDragging: false,
+            previousMousePosition: { x: 0, y: 0 },
+            isActive: false,
+            isDetailViewOpen: false,
+            raycaster: null,
+            mousePos: new THREE.Vector2(),
+
+            init() {
+                // Setup slots logic
+                this.setupSlotsConfig();
+
+                const container = document.getElementById('webgl-container');
+                
+                // Scene
+                this.scene = new THREE.Scene();
+                this.scene.background = new THREE.Color(0xf5f6f8); // Light fog/bg
+                this.scene.fog = new THREE.Fog(0xf5f6f8, 10, 50);
+
+                // Camera
+                this.camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 100);
+                this.camera.position.set(0, 5, 0); // Eye level
+                
+                // Renderer
+                this.renderer = new THREE.WebGLRenderer({ antialias: true });
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                this.renderer.shadowMap.enabled = true;
+                this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                this.renderer.outputEncoding = THREE.sRGBEncoding;
+                container.appendChild(this.renderer.domElement);
+
+                // Lighting
+                const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+                this.scene.add(ambientLight);
+
+                const centerLight = new THREE.PointLight(0xffeedd, 0.5, 50);
+                centerLight.position.set(0, 12, 0);
+                centerLight.castShadow = true;
+                centerLight.shadow.mapSize.width = 1024;
+                centerLight.shadow.mapSize.height = 1024;
+                this.scene.add(centerLight);
+
+                // Environment (Room)
+                this.buildRoom();
+                
+                // Frames
+                this.buildFrames();
+
+                // Raycaster for interactions
+                this.raycaster = new THREE.Raycaster();
+
+                // Events
+                window.addEventListener('resize', () => this.onWindowResize(), false);
+                this.setupControls();
+
+                // Start loop
+                this.animate();
+            },
+
+            setupSlotsConfig() {
+                // Wall layout mapping
+                // Room is 40x40 (from -20 to 20).
+                const y = 6; // Height of frame center
+                this.slotsConfig = [
+                    // North wall (z = -19.9)
+                    { id: 's1', pos: [-10, y, -19.9], rot: [0, 0, 0] },
+                    { id: 's2', pos: [0, y, -19.9], rot: [0, 0, 0] },
+                    { id: 's3', pos: [10, y, -19.9], rot: [0, 0, 0] },
+                    // East wall (x = 19.9)
+                    { id: 's4', pos: [19.9, y, -10], rot: [0, -Math.PI/2, 0] },
+                    { id: 's5', pos: [19.9, y, 0], rot: [0, -Math.PI/2, 0] },
+                    { id: 's6', pos: [19.9, y, 10], rot: [0, -Math.PI/2, 0] },
+                    // West wall (x = -19.9)
+                    { id: 's7', pos: [-19.9, y, -10], rot: [0, Math.PI/2, 0] },
+                    { id: 's8', pos: [-19.9, y, 0], rot: [0, Math.PI/2, 0] },
+                    { id: 's9', pos: [-19.9, y, 10], rot: [0, Math.PI/2, 0] },
+                    // South wall (z = 19.9) - excluding door area
+                    { id: 's10', pos: [-12, y, 19.9], rot: [0, Math.PI, 0] },
+                    { id: 's11', pos: [12, y, 19.9], rot: [0, Math.PI, 0] },
+                ];
+            },
+
+            buildRoom() {
+                const roomSize = 40;
+                const wallHeight = 15;
+
+                // Floor
+                const floorGeo = new THREE.PlaneGeometry(roomSize, roomSize);
+                const floorMat = new THREE.MeshStandardMaterial({ 
+                    color: 0xdddddd,
+                    roughness: 0.2,
+                    metalness: 0.1
+                });
+                const floor = new THREE.Mesh(floorGeo, floorMat);
+                floor.rotation.x = -Math.PI / 2;
+                floor.receiveShadow = true;
+                this.scene.add(floor);
+
+                // Ceiling
+                const ceilingGeo = new THREE.PlaneGeometry(roomSize, roomSize);
+                const ceilingMat = new THREE.MeshStandardMaterial({ color: 0xf0f0f0, roughness: 0.9 });
+                const ceiling = new THREE.Mesh(ceilingGeo, ceilingMat);
+                ceiling.rotation.x = Math.PI / 2;
+                ceiling.position.y = wallHeight;
+                this.scene.add(ceiling);
+
+                // Walls
+                const wallMat = new THREE.MeshStandardMaterial({ color: 0xefefef, roughness: 0.8 });
+                
+                const createWall = (w, h, p, r) => {
+                    const geo = new THREE.PlaneGeometry(w, h);
+                    const mesh = new THREE.Mesh(geo, wallMat);
+                    mesh.position.set(...p);
+                    mesh.rotation.set(...r);
+                    mesh.receiveShadow = true;
+                    this.scene.add(mesh);
+                };
+
+                createWall(roomSize, wallHeight, [0, wallHeight/2, -roomSize/2], [0, 0, 0]); // North
+                createWall(roomSize, wallHeight, [0, wallHeight/2, roomSize/2], [0, Math.PI, 0]); // South
+                createWall(roomSize, wallHeight, [roomSize/2, wallHeight/2, 0], [0, -Math.PI/2, 0]); // East
+                createWall(roomSize, wallHeight, [-roomSize/2, wallHeight/2, 0], [0, Math.PI/2, 0]); // West
+                
+                // Add some skirting board for realism
+                const skirtingGeo = new THREE.BoxGeometry(roomSize, 0.4, 0.2);
+                const skirtingMat = new THREE.MeshStandardMaterial({ color: 0xaaaaaa });
+                const addSkirting = (p, r) => {
+                    const mesh = new THREE.Mesh(skirtingGeo, skirtingMat);
+                    mesh.position.set(...p);
+                    mesh.rotation.set(...r);
+                    this.scene.add(mesh);
+                };
+                addSkirting([0, 0.2, -roomSize/2 + 0.1], [0,0,0]);
+                addSkirting([0, 0.2, roomSize/2 - 0.1], [0,0,0]);
+                addSkirting([roomSize/2 - 0.1, 0.2, 0], [0,Math.PI/2,0]);
+                addSkirting([-roomSize/2 + 0.1, 0.2, 0], [0,Math.PI/2,0]);
+            },
+
+            buildFrames() {
+                // Clear existing frames
+                this.frames.forEach(f => this.scene.remove(f));
+                this.frames = [];
+
+                const textureLoader = new THREE.TextureLoader();
+
+                this.slotsConfig.forEach(slot => {
+                    const artworkId = State.placements[slot.id];
+                    const frameGroup = new THREE.Group();
+                    frameGroup.position.set(...slot.pos);
+                    frameGroup.rotation.set(...slot.rot);
+
+                    // Frame border
+                    const frameWidth = 4;
+                    const frameHeight = 3; // default ratio
+                    const frameThickness = 0.2;
+                    
+                    const borderGeo = new THREE.BoxGeometry(frameWidth + 0.4, frameHeight + 0.4, frameThickness);
+                    const borderMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.6 });
+                    const borderMesh = new THREE.Mesh(borderGeo, borderMat);
+                    borderMesh.position.z = frameThickness / 2;
+                    borderMesh.castShadow = true;
+                    frameGroup.add(borderMesh);
+
+                    // Canvas (Image surface)
+                    const canvasGeo = new THREE.PlaneGeometry(frameWidth, frameHeight);
+                    let canvasMat;
+                    
+                    // Create info panel below frame
+                    const infoGeo = new THREE.PlaneGeometry(2, 0.6);
+                    const infoMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+                    const infoMesh = new THREE.Mesh(infoGeo, infoMat);
+                    infoMesh.position.set(0, -frameHeight/2 - 0.8, 0.05);
+                    frameGroup.add(infoMesh);
+
+                    if (artworkId) {
+                        const art = State.artworks.find(a => a.id === artworkId);
+                        if (art) {
+                            textureLoader.load(art.imageBase64, (texture) => {
+                                texture.encoding = THREE.sRGBEncoding;
+                                // Adjust aspect ratio based on texture
+                                const aspect = texture.image.width / texture.image.height;
+                                let newW = frameWidth;
+                                let newH = frameWidth / aspect;
+                                if(newH > 4) { newH = 4; newW = 4 * aspect; } // cap height
+                                
+                                canvasGeo.parameters.width = newW;
+                                canvasGeo.parameters.height = newH;
+                                canvasGeo.dispose();
+                                const updatedCanvasGeo = new THREE.PlaneGeometry(newW, newH);
+                                
+                                borderMesh.geometry.dispose();
+                                borderMesh.geometry = new THREE.BoxGeometry(newW + 0.4, newH + 0.4, frameThickness);
+
+                                const imgMat = new THREE.MeshBasicMaterial({ map: texture });
+                                const canvasMesh = new THREE.Mesh(updatedCanvasGeo, imgMat);
+                                canvasMesh.position.z = frameThickness + 0.01;
+                                canvasMesh.userData = { isArtwork: true, id: artworkId };
+                                frameGroup.add(canvasMesh);
+                                
+                                // Add subtle spotlight for filled frame
+                                const spot = new THREE.SpotLight(0xffeedd, 0.8, 15, Math.PI/6, 0.5, 1);
+                                spot.position.set(slot.pos[0], slot.pos[1] + 5, slot.pos[2] + (slot.pos[2] < 0 ? 5 : (slot.pos[2] > 0 ? -5 : 0))); // simplified offset calculation
+                                // Fix spotlight target based on rotation
+                                const target = new THREE.Object3D();
+                                target.position.copy(frameGroup.position);
+                                this.scene.add(target);
+                                spot.target = target;
+                                this.scene.add(spot);
+                            });
+                        }
+                    } else {
+                        // Empty slot
+                        canvasMat = new THREE.MeshBasicMaterial({ color: 0xd0d0d0 });
+                        const canvasMesh = new THREE.Mesh(canvasGeo, canvasMat);
+                        canvasMesh.position.z = frameThickness + 0.01;
+                        frameGroup.add(canvasMesh);
+                    }
+
+                    this.scene.add(frameGroup);
+                    this.frames.push(frameGroup);
+                });
+            },
+
+            setupControls() {
+                // WASD Keys
+                document.addEventListener('keydown', (e) => {
+                    if(!this.isActive || this.isDetailViewOpen) return;
+                    const key = e.key.toLowerCase();
+                    if(this.keys.hasOwnProperty(key)) this.keys[key] = true;
+                });
+                document.addEventListener('keyup', (e) => {
+                    const key = e.key.toLowerCase();
+                    if(this.keys.hasOwnProperty(key)) this.keys[key] = false;
+                });
+
+                // Mouse look (Drag)
+                const canvas = this.renderer.domElement;
+                canvas.addEventListener('mousedown', (e) => {
+                    if(!this.isActive || this.isDetailViewOpen) return;
+                    this.isDragging = true;
+                    this.previousMousePosition = { x: e.offsetX, y: e.offsetY };
+                });
+                canvas.addEventListener('mousemove', (e) => {
+                    if(!this.isActive || this.isDetailViewOpen) return;
+                    
+                    // Raycast for hover effect
+                    this.mousePos.x = (e.clientX / window.innerWidth) * 2 - 1;
+                    this.mousePos.y = -(e.clientY / window.innerHeight) * 2 + 1;
+                    this.checkIntersection();
+
+                    if (!this.isDragging) return;
+                    
+                    const deltaX = e.offsetX - this.previousMousePosition.x;
+                    const deltaY = e.offsetY - this.previousMousePosition.y;
+
+                    this.yaw -= deltaX * 0.005;
+                    this.pitch -= deltaY * 0.005;
+                    this.pitch = Math.max(-Math.PI/3, Math.min(Math.PI/3, this.pitch));
+
+                    this.camera.rotation.set(this.pitch, this.yaw, 0, 'YXZ');
+                    
+                    this.previousMousePosition = { x: e.offsetX, y: e.offsetY };
+                });
+                document.addEventListener('mouseup', () => { this.isDragging = false; });
+
+                // Click interaction
+                canvas.addEventListener('click', (e) => {
+                    if(!this.isActive || this.isDetailViewOpen) return;
+                    if(Math.abs(e.offsetX - this.previousMousePosition.x) > 5) return; // Ignore drag clicks
+
+                    this.raycaster.setFromCamera(this.mousePos, this.camera);
+                    const intersects = this.raycaster.intersectObjects(this.scene.children, true);
+                    
+                    for (let i = 0; i < intersects.length; i++) {
+                        if (intersects[i].object.userData.isArtwork) {
+                            UI.showDetailModal(intersects[i].object.userData.id);
+                            break;
+                        }
+                    }
+                });
+
+                // Touch Support for mobile look
+                canvas.addEventListener('touchstart', (e) => {
+                    if(!this.isActive || this.isDetailViewOpen) return;
+                    this.isDragging = true;
+                    this.previousMousePosition = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                }, {passive: false});
+                
+                canvas.addEventListener('touchmove', (e) => {
+                    if(!this.isActive || this.isDetailViewOpen || !this.isDragging) return;
+                    e.preventDefault();
+                    const deltaX = e.touches[0].clientX - this.previousMousePosition.x;
+                    const deltaY = e.touches[0].clientY - this.previousMousePosition.y;
+                    this.yaw -= deltaX * 0.008;
+                    this.pitch -= deltaY * 0.008;
+                    this.pitch = Math.max(-Math.PI/3, Math.min(Math.PI/3, this.pitch));
+                    this.camera.rotation.set(this.pitch, this.yaw, 0, 'YXZ');
+                    this.previousMousePosition = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                }, {passive: false});
+
+                canvas.addEventListener('touchend', () => { this.isDragging = false; });
+            },
+
+            checkIntersection() {
+                this.raycaster.setFromCamera(this.mousePos, this.camera);
+                const intersects = this.raycaster.intersectObjects(this.scene.children, true);
+                let hoveringArt = false;
+                for (let i = 0; i < intersects.length; i++) {
+                    if (intersects[i].object.userData.isArtwork) {
+                        hoveringArt = true;
+                        break;
+                    }
+                }
+                this.renderer.domElement.style.cursor = hoveringArt ? 'pointer' : (this.isDragging ? 'grabbing' : 'grab');
+            },
+
+            onWindowResize() {
+                this.camera.aspect = window.innerWidth / window.innerHeight;
+                this.camera.updateProjectionMatrix();
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+            },
+
+            updateGallery() {
+                // Rebuild frames based on new placements
+                this.buildFrames();
+            },
+
+            pause() {
+                this.isActive = false;
+            },
+
+            resume() {
+                this.isActive = true;
+            },
+
+            animate() {
+                requestAnimationFrame(() => this.animate());
+
+                if (this.isActive && !this.isDetailViewOpen) {
+                    // Movement Logic
+                    const speed = 0.2;
+                    const dir = new THREE.Vector3();
+                    this.camera.getWorldDirection(dir);
+                    dir.y = 0; dir.normalize();
+                    
+                    const sideDir = new THREE.Vector3().copy(dir).cross(this.camera.up).normalize();
+
+                    const oldPos = this.camera.position.clone();
+
+                    if(this.keys.w) this.camera.position.addScaledVector(dir, speed);
+                    if(this.keys.s) this.camera.position.addScaledVector(dir, -speed);
+                    if(this.keys.a) this.camera.position.addScaledVector(sideDir, -speed);
+                    if(this.keys.d) this.camera.position.addScaledVector(sideDir, speed);
+
+                    // Basic Collision (Keep inside room)
+                    const limit = 18;
+                    if(this.camera.position.x > limit) this.camera.position.x = limit;
+                    if(this.camera.position.x < -limit) this.camera.position.x = -limit;
+                    if(this.camera.position.z > limit) this.camera.position.z = limit;
+                    if(this.camera.position.z < -limit) this.camera.position.z = -limit;
+                }
+
+                this.renderer.render(this.scene, this.camera);
+            }
+        };
+
+
+        // --- 4. DRAWING STUDIO ENGINE (CANVAS 2D) ---
+        const StudioEngine = {
+            canvas: null, ctx: null,
+            isDrawing: false,
+            currentTool: 'brush', // brush, pencil, eraser
+            color: '#1a1a1a',
+            lineWidth: 5,
+            history: [],
+            historyStep: -1,
+            isMetadataOpen: true, // Status visibilitas panel metadata
+            
+            init() {
+                this.canvas = document.getElementById('drawing-board');
+                this.ctx = this.canvas.getContext('2d', { willReadFrequently: true });
+                
+                // Set solid white background initially
+                this.ctx.fillStyle = '#ffffff';
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                this.saveState();
+
+                this.setupEvents();
+            },
+
+            toggleMetadataPanel() {
+                const panel = document.getElementById('studio-metadata-panel');
+                const btnText = document.getElementById('btn-toggle-metadata-text');
+                const btn = document.getElementById('btn-toggle-metadata');
+                const floatingOpenBtn = document.getElementById('floating-open-metadata');
+                
+                this.isMetadataOpen = !this.isMetadataOpen;
+
+                if (this.isMetadataOpen) {
+                    // Tampilkan panel
+                    panel.classList.remove('w-0', 'p-0', 'border-l-0', 'opacity-0', 'pointer-events-none');
+                    panel.classList.add('w-72', 'p-5');
+                    if (btnText) btnText.innerText = 'Tutup Metadata';
+                    btn.classList.add('bg-violet-50', 'text-violet-700');
+                    btn.classList.remove('bg-white', 'text-slate-600');
+                    if (floatingOpenBtn) {
+                        floatingOpenBtn.classList.add('hidden');
+                        floatingOpenBtn.classList.remove('flex');
+                    }
+                } else {
+                    // Sembunyikan panel
+                    panel.classList.remove('w-72', 'p-5');
+                    panel.classList.add('w-0', 'p-0', 'border-l-0', 'opacity-0', 'pointer-events-none');
+                    if (btnText) btnText.innerText = 'Buka Metadata';
+                    btn.classList.remove('bg-violet-50', 'text-violet-700');
+                    btn.classList.add('bg-white', 'text-slate-600');
+                    if (floatingOpenBtn) {
+                        floatingOpenBtn.classList.remove('hidden');
+                        floatingOpenBtn.classList.add('flex');
+                    }
+                }
+
+                // Berikan jeda transisi selesai sebelum menghitung ulang dimensi kanvas
+                setTimeout(() => {
+                    this.resizeCanvas();
+                }, 320);
+            },
+
+            resizeCanvas() {
+                // Maintain aspect ratio, scale visually using CSS, internal resolution stays fixed for simplicity
+                const container = this.canvas.parentElement ? this.canvas.parentElement.parentElement : null;
+                if (!container || container.clientWidth === 0) return;
+                
+                const aspect = 800 / 600;
+                // Hitung ruang tersedia dengan padding yang aman
+                let availableW = container.clientWidth - 48;
+                let availableH = container.clientHeight - 48;
+                
+                let w = availableW;
+                let h = w / aspect;
+                
+                if (h > availableH) {
+                    h = availableH;
+                    w = h * aspect;
+                }
+                
+                this.canvas.style.width = `${Math.floor(w)}px`;
+                this.canvas.style.height = `${Math.floor(h)}px`;
+            },
+
+            setupEvents() {
+                const getPos = (e) => {
+                    const rect = this.canvas.getBoundingClientRect();
+                    const scaleX = this.canvas.width / rect.width;
+                    const scaleY = this.canvas.height / rect.height;
+                    
+                    let clientX = e.clientX;
+                    let clientY = e.clientY;
+                    
+                    if (e.touches && e.touches.length > 0) {
+                        clientX = e.touches[0].clientX;
+                        clientY = e.touches[0].clientY;
+                    }
+                    
+                    return {
+                        x: (clientX - rect.left) * scaleX,
+                        y: (clientY - rect.top) * scaleY
+                    };
+                };
+
+                const startDraw = (e) => {
+                    if (e.type !== 'mousedown' && e.type !== 'touchstart') return;
+                    this.isDrawing = true;
+                    const pos = getPos(e);
+                    
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(pos.x, pos.y);
+                    
+                    // Styling based on tool
+                    if (this.currentTool === 'eraser') {
+                        this.ctx.globalCompositeOperation = 'destination-out';
+                        this.ctx.lineWidth = this.lineWidth * 2; // eraser usually bigger
+                        this.ctx.globalAlpha = 1.0;
+                    } else {
+                        this.ctx.globalCompositeOperation = 'source-over';
+                        this.ctx.strokeStyle = this.color;
+                        this.ctx.lineWidth = this.lineWidth;
+                        this.ctx.lineCap = 'round';
+                        this.ctx.lineJoin = 'round';
+                        
+                        if (this.currentTool === 'pencil') {
+                            this.ctx.globalAlpha = 0.5; // slight transparency for pencil feel
+                        } else {
+                            this.ctx.globalAlpha = 1.0; // brush
+                        }
+                    }
+                };
+
+                const draw = (e) => {
+                    if (!this.isDrawing) return;
+                    e.preventDefault(); // prevent scroll on touch
+                    const pos = getPos(e);
+                    
+                    this.ctx.lineTo(pos.x, pos.y);
+                    this.ctx.stroke();
+                    
+                    // Reset path dari posisi saat ini untuk mencegah penggambaran ulang segmen sebelumnya (mencegah lag)
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(pos.x, pos.y);
+                };
+
+                const endDraw = () => {
+                    if (this.isDrawing) {
+                        this.isDrawing = false;
+                        this.ctx.closePath();
+                        this.ctx.globalAlpha = 1.0; // reset
+                        this.saveState();
+                    }
+                };
+
+                this.canvas.addEventListener('mousedown', startDraw);
+                this.canvas.addEventListener('mousemove', draw);
+                window.addEventListener('mouseup', endDraw); // attach to window to catch releases outside
+                
+                this.canvas.addEventListener('touchstart', startDraw, {passive: false});
+                this.canvas.addEventListener('touchmove', draw, {passive: false});
+                window.addEventListener('touchend', endDraw);
+                
+                window.addEventListener('resize', () => this.resizeCanvas());
+            },
+
+            setTool(tool) {
+                this.currentTool = tool;
+                // Update UI with Anime Styling
+                ['brush', 'pencil', 'eraser'].forEach(t => {
+                    const btn = document.getElementById(`tool-${t}`);
+                    if(t === tool) {
+                        btn.className = 'w-14 h-14 rounded-2xl bg-orange-400 text-slate-950 flex flex-col items-center justify-center text-xl border-2 border-slate-900 shadow-comic transition-all';
+                    } else {
+                        btn.className = 'w-14 h-14 rounded-2xl bg-slate-50 text-slate-600 hover:bg-violet-100 flex flex-col items-center justify-center text-xl border-2 border-slate-900 transition-all';
+                    }
+                });
+            },
+
+            setColor(hex) {
+                this.color = hex;
+                if(this.currentTool === 'eraser') this.setTool('brush'); // Auto switch back to brush if picking color
+            },
+
+            setSize(val) {
+                this.lineWidth = parseInt(val);
+            },
+
+            clearCanvas() {
+                // Ask confirmation via custom modal? Or just clear. For MVP just clear and save state.
+                this.ctx.globalCompositeOperation = 'source-over';
+                this.ctx.fillStyle = '#ffffff';
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                this.saveState();
+            },
+
+            saveState() {
+                // Remove future states if we drew after undoing
+                if (this.historyStep < this.history.length - 1) {
+                    this.history.length = this.historyStep + 1;
+                }
+                this.history.push(this.canvas.toDataURL());
+                this.historyStep++;
+                
+                // Limit history to 20 steps to save memory
+                if (this.history.length > 20) {
+                    this.history.shift();
+                    this.historyStep--;
+                }
+            },
+
+            undo() {
+                if (this.historyStep > 0) {
+                    this.historyStep--;
+                    this.restoreState();
+                }
+            },
+
+            redo() {
+                if (this.historyStep < this.history.length - 1) {
+                    this.historyStep++;
+                    this.restoreState();
+                }
+            },
+
+            restoreState() {
+                const img = new Image();
+                img.onload = () => {
+                    this.ctx.globalCompositeOperation = 'source-over';
+                    this.ctx.globalAlpha = 1.0;
+                    this.ctx.clearRect(0,0,this.canvas.width, this.canvas.height);
+                    this.ctx.drawImage(img, 0, 0);
+                };
+                img.src = this.history[this.historyStep];
+            },
+
+            saveArtwork() {
+                const title = document.getElementById('studio-title').value.trim();
+                const artist = document.getElementById('studio-artist').value.trim();
+                const category = document.getElementById('studio-category').value;
+                const desc = document.getElementById('studio-desc').value.trim();
+
+                if (!title || !artist) {
+                    UI.showMessage('Data Tidak Lengkap', 'Mohon isi Judul Karya dan Nama Seniman.', 'error');
+                    return;
+                }
+
+                // Ensure white background before export (just in case eraser caused transparency)
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = this.canvas.width;
+                tempCanvas.height = this.canvas.height;
+                const tCtx = tempCanvas.getContext('2d');
+                tCtx.fillStyle = '#ffffff';
+                tCtx.fillRect(0,0,tempCanvas.width, tempCanvas.height);
+                tCtx.drawImage(this.canvas, 0, 0);
+
+                const dataUrl = tempCanvas.toDataURL('image/jpeg', 0.85);
+
+                const newArtwork = {
+                    id: 'art-' + Date.now(),
+                    title,
+                    artist,
+                    year: new Date().getFullYear().toString(),
+                    category,
+                    desc,
+                    imageBase64: dataUrl
+                };
+
+                State.artworks.push(newArtwork);
+                if (StorageAdapter.saveArtworks()) {
+                    UI.showMessage('Berhasil', 'Karya berhasil disimpan ke dalam koleksi museum!', 'success');
+                    // Reset form
+                    document.getElementById('studio-title').value = '';
+                    document.getElementById('studio-desc').value = '';
+                    this.clearCanvas();
+                }
+            }
+        };
+
+
+        // --- 5. ARTWORK UPLOAD & MANAGER ---
+        const ArtworkManager = {
+            currentPreviewBase64: null,
+
+            handleFileUpload(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                // Validate
+                if (file.size > 5 * 1024 * 1024) {
+                    UI.showMessage('Berkas Terlalu Besar', 'Ukuran maksimal berkas adalah 5MB.', 'error');
+                    return;
+                }
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        // Compress image to save localStorage space
+                        const canvas = document.createElement('canvas');
+                        let w = img.width; let h = img.height;
+                        const maxDim = 1200;
+                        if (w > maxDim || h > maxDim) {
+                            if (w > h) { h = (h/w)*maxDim; w = maxDim; } 
+                            else { w = (w/h)*maxDim; h = maxDim; }
+                        }
+                        canvas.width = w; canvas.height = h;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, w, h);
+                        
+                        this.currentPreviewBase64 = canvas.toDataURL('image/jpeg', 0.85);
+                        
+                        // Update UI
+                        document.getElementById('upload-placeholder').classList.add('hidden');
+                        const previewImg = document.getElementById('upload-preview-img');
+                        previewImg.src = this.currentPreviewBase64;
+                        previewImg.classList.remove('hidden');
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            },
+
+            saveUploadedArtwork() {
+                if (!this.currentPreviewBase64) {
+                    UI.showMessage('Tidak ada gambar', 'Silakan pilih berkas gambar terlebih dahulu.', 'error');
+                    return;
+                }
+
+                const title = document.getElementById('upload-title').value.trim();
+                const artist = document.getElementById('upload-artist').value.trim();
+                const year = document.getElementById('upload-year').value.trim();
+                const category = document.getElementById('upload-category').value;
+                const desc = document.getElementById('upload-desc').value.trim();
+
+                if (!title || !artist) {
+                    UI.showMessage('Data Tidak Lengkap', 'Mohon isi Judul Karya dan Nama Seniman.', 'error');
+                    return;
+                }
+
+                const newArtwork = {
+                    id: 'art-' + Date.now(),
+                    title,
+                    artist,
+                    year: year || new Date().getFullYear().toString(),
+                    category,
+                    desc,
+                    imageBase64: this.currentPreviewBase64
+                };
+
+                State.artworks.push(newArtwork);
+                if(StorageAdapter.saveArtworks()) {
+                    UI.showMessage('Berhasil', 'Karya berhasil diunggah ke koleksi museum!', 'success');
+                    
+                    // Reset
+                    this.currentPreviewBase64 = null;
+                    document.getElementById('upload-placeholder').classList.remove('hidden');
+                    document.getElementById('upload-preview-img').classList.add('hidden');
+                    document.getElementById('upload-preview-img').src = '';
+                    document.getElementById('upload-title').value = '';
+                    document.getElementById('upload-desc').value = '';
+                }
+            }
+        };
+
+
+        // --- 6. GALLERY PLACEMENT ENGINE ---
+        const GalleryEngine = {
+            renderCurateUI() {
+                const grid = document.getElementById('collection-grid');
+                grid.innerHTML = '';
+                
+                State.artworks.forEach(art => {
+                    const el = document.createElement('div');
+                    el.className = 'bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm cursor-grab hover:shadow-md transition-all flex flex-col group';
+                    el.draggable = true;
+                    el.dataset.id = art.id;
+                    
+                    el.innerHTML = `
+                        <div class="h-24 bg-slate-100 relative overflow-hidden">
+                            <img src="${art.imageBase64}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
+                        </div>
+                        <div class="p-2">
+                            <h4 class="font-bold text-slate-900 text-xs truncate">${art.title}</h4>
+                            <p class="text-[10px] text-slate-500 truncate">${art.artist}</p>
+                        </div>
+                    `;
+                    
+                    el.addEventListener('dragstart', (e) => {
+                        e.dataTransfer.setData('text/plain', art.id);
+                        el.classList.add('opacity-50');
+                    });
+                    el.addEventListener('dragend', () => el.classList.remove('opacity-50'));
+                    
+                    grid.appendChild(el);
+                });
+
+                this.renderSlotsList();
+            },
+
+            renderSlotsList() {
+                const list = document.getElementById('slots-list');
+                list.innerHTML = '';
+
+                MuseumEngine.slotsConfig.forEach(slot => {
+                    const placedArtId = State.placements[slot.id];
+                    let artHtml = '<div class="text-slate-400 text-[10px] italic">Slot kosong. Tarik karya ke sini</div>';
+                    
+                    if (placedArtId) {
+                        const art = State.artworks.find(a => a.id === placedArtId);
+                        if (art) {
+                            artHtml = `
+                                <div class="flex items-center gap-2 bg-white p-1.5 rounded-lg border border-slate-200 shadow-xs">
+                                    <img src="${art.imageBase64}" class="w-8 h-8 object-cover rounded border border-slate-200">
+                                    <div class="flex-1 overflow-hidden">
+                                        <h5 class="text-xs font-bold text-slate-900 truncate">${art.title}</h5>
+                                        <p class="text-[9px] text-slate-400 truncate">${art.artist}</p>
+                                    </div>
+                                    <button onclick="GalleryEngine.removeArtwork('${slot.id}')" class="text-slate-400 hover:text-rose-500 p-1 text-xs"><i class="fa-solid fa-xmark"></i></button>
+                                </div>
+                            `;
+                        }
+                    }
+
+                    const el = document.createElement('div');
+                    el.className = 'p-2 bg-white rounded-xl border border-dashed border-slate-200 transition-colors';
+                    el.dataset.slot = slot.id;
+                    
+                    let zoneName = "Galeri Utama";
+                    if(slot.pos[2] < -10) zoneName = "Dinding Utara";
+                    else if(slot.pos[0] > 10) zoneName = "Dinding Timur";
+                    else if(slot.pos[0] < -10) zoneName = "Dinding Barat";
+                    else zoneName = "Dinding Selatan";
+
+                    el.innerHTML = `
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-[10px] font-bold text-violet-700 uppercase tracking-wide">${zoneName} (Slot ${slot.id.replace('s','')})</span>
+                        </div>
+                        <div class="slot-content">
+                            ${artHtml}
+                        </div>
+                    `;
+
+                    el.addEventListener('dragover', (e) => {
+                        e.preventDefault();
+                        el.classList.add('border-violet-500', 'bg-violet-50/50');
+                    });
+                    el.addEventListener('dragleave', () => {
+                        el.classList.remove('border-violet-500', 'bg-violet-50/50');
+                    });
+                    el.addEventListener('drop', (e) => {
+                        e.preventDefault();
+                        el.classList.remove('border-violet-500', 'bg-violet-50/50');
+                        const artId = e.dataTransfer.getData('text/plain');
+                        if (artId) {
+                            State.placements[slot.id] = artId;
+                            this.renderSlotsList();
+                        }
+                    });
+
+                    list.appendChild(el);
+                });
+            },
+
+            removeArtwork(slotId) {
+                State.placements[slotId] = null;
+                this.renderSlotsList();
+            },
+
+            applyChanges() {
+                StorageAdapter.savePlacements();
+                MuseumEngine.updateGallery();
+                UI.showMessage('Sukses', 'Perubahan tata letak galeri telah diterapkan ke lingkungan 3D.', 'success');
+            }
+        };
+
+
+        // --- 7. MAIN INITIALIZATION ---
+        const App = {
+            init() {
+                StorageAdapter.init();
+                UI.init();
+                MuseumEngine.init();
+                StudioEngine.init();
+                
+                // Show home
+                UI.switchView('home');
+
+                console.log("Animation Drawing Museum 3D Initialized Successfully.");
+            },
+            switchView(v) { UI.switchView(v); }
+        };
+
+        // Run when DOM is loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            App.init();
+        });
+
+    </script>
+</body>
+</html>
